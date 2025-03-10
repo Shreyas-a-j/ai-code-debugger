@@ -4,8 +4,8 @@ import env from '../../config/env';
 class AIService {
   constructor() {
     this.apiKey = env.HUGGING_FACE_API_KEY;
-    // Using CodeBERT model which is better suited for code analysis
-    this.apiUrl = 'https://api-inference.huggingface.co/models/microsoft/codebert-base';
+    // Using a more appropriate model for chat and code generation
+    this.apiUrl = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2';
   }
 
   async analyzeCode(code, language) {
@@ -319,6 +319,129 @@ class AIService {
         data: error.response?.data
       });
       return false;
+    }
+  }
+
+  async chatWithAI(prompt, code, language) {
+    try {
+      let inputPrompt;
+      if (language === 'general') {
+        // For general chat, use a more focused prompt
+        if (prompt.toLowerCase().includes('what can you do') || 
+            prompt.toLowerCase().includes('help me') || 
+            prompt.toLowerCase().includes('abilities')) {
+          return "I can help you write, debug, and optimize code in multiple languages.";
+        }
+        inputPrompt = `<s>[INST] You are a coding assistant. Respond in 2-3 sentences maximum. Focus only on coding-related topics. ${prompt} [/INST]</s>`;
+      } else {
+        inputPrompt = `<s>[INST] As an AI coding assistant, please help with the following:\n\nCode:\n${code}\n\nLanguage: ${language}\n\nUser Question: ${prompt} [/INST]</s>`;
+      }
+
+      const response = await axios.post(
+        this.apiUrl,
+        {
+          inputs: inputPrompt,
+          parameters: {
+            max_new_tokens: 500,
+            temperature: 0.7,
+            top_p: 0.95,
+          },
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      // Remove the prompt text from the response
+      let responseText = response.data[0].generated_text;
+      responseText = responseText.replace(/<s>\[INST\].*?\[\/INST\]<\/s>/g, '').trim();
+      return responseText;
+    } catch (error) {
+      console.error('Chat error:', error);
+      return "I apologize, but I'm having trouble connecting to the AI service right now. Please try again in a moment.";
+    }
+  }
+
+  async generateCode(description, language) {
+    try {
+      const response = await axios.post(
+        this.apiUrl,
+        {
+          inputs: `<s>[INST] Generate ${language} code for the following description:\n${description}\n\nPlease provide only the code without any explanations. [/INST]</s>`,
+          parameters: {
+            max_new_tokens: 1000,
+            temperature: 0.7,
+            top_p: 0.95,
+          },
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data[0].generated_text;
+    } catch (error) {
+      console.error('Code generation error:', error);
+      // Return a fallback response if the API fails
+      return `// Generated ${language} code\n// Please try again if this doesn't match your requirements\nfunction example() {\n  // Your code here\n}`;
+    }
+  }
+
+  async fixCode(code, issue, language) {
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: `Fix the following ${language} code issue:\n\nCode:\n${code}\n\nIssue: ${issue}`,
+          parameters: {
+            max_new_tokens: 1000,
+            temperature: 0.7,
+            top_p: 0.95,
+          },
+        }),
+      });
+
+      const data = await response.json();
+      return data[0].generated_text;
+    } catch (error) {
+      console.error('Code fixing error:', error);
+      throw new Error('Failed to fix code');
+    }
+  }
+
+  async enhanceCode(code, language) {
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: `Enhance and optimize the following ${language} code:\n${code}`,
+          parameters: {
+            max_new_tokens: 1000,
+            temperature: 0.7,
+            top_p: 0.95,
+          },
+        }),
+      });
+
+      const data = await response.json();
+      return data[0].generated_text;
+    } catch (error) {
+      console.error('Code enhancement error:', error);
+      throw new Error('Failed to enhance code');
     }
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { ThemeProvider } from '@emotion/react';
 import { lightTheme, darkTheme } from './styles/theme';
 import NewHeader from './components/UI/NewHeader';
@@ -8,6 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { keyboardService } from './services/utils/keyboardService';
 import { notificationService } from './services/utils/notificationService';
 import { historyService } from './services/utils/historyService';
+import UserProfile from './components/UserProfile/UserProfile';
 
 // Lazy load components to reduce initial bundle size
 const CodeEditor = React.lazy(() => import('./components/CodeEditor/CodeEditor'));
@@ -31,11 +32,13 @@ const LoadingFallback = () => (
 );
 
 const AppContent = ({ isDarkMode, setIsDarkMode }) => {
+  const debuggerRef = useRef(null);
   const { user } = useAuth();
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('javascript');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -95,6 +98,11 @@ const AppContent = ({ isDarkMode, setIsDarkMode }) => {
     }
   }, []);
 
+  const handleLanguageChange = (newLanguage) => {
+    setLanguage(newLanguage);
+    notificationService.info(`Language changed to ${newLanguage}`);
+  };
+
   useEffect(() => {
     keyboardService.register('d', handleVoiceDebug, 'Debug Code');
     keyboardService.register('o', handleVoiceOptimize, 'Optimize Code');
@@ -145,11 +153,13 @@ const AppContent = ({ isDarkMode, setIsDarkMode }) => {
               onLanguageChange={setLanguage}
             />
             <AIDebugger
+              ref={debuggerRef}
               code={code}
               language={language}
               isProcessing={isProcessing}
               setIsProcessing={setIsProcessing}
               onCodeOptimized={handleCodeOptimized}
+              onLanguageChange={handleLanguageChange}
             />
           </ErrorBoundary>
         </Suspense>
@@ -166,6 +176,11 @@ const AppContent = ({ isDarkMode, setIsDarkMode }) => {
           onClose={() => setIsShortcutsModalOpen(false)}
         />
       </Suspense>
+      {showProfile ? (
+        <UserProfile />
+      ) : (
+        <button onClick={() => setShowProfile(true)}>Profile</button>
+      )}
     </div>
   );
 };
