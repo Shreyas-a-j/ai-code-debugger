@@ -1,42 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
-const getSupabaseClient = () => {
-  try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL?.trim();
-    const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY?.trim();
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Missing Supabase configuration');
-    }
+if (!supabaseUrl) {
+  throw new Error('Supabase URL is not defined in environment variables');
+}
 
-    // Construct full URL
-    const fullUrl = supabaseUrl.includes('https://') 
-      ? supabaseUrl 
-      : `https://${supabaseUrl}`;
+if (!supabaseAnonKey) {
+  throw new Error('Supabase Anon Key is not defined in environment variables');
+}
 
-    return createClient(fullUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce'
-      }
-    });
-  } catch (error) {
-    console.error('Supabase client creation error:', error);
-    // Return a mock client for development
-    return {
-      auth: {
-        signOut: async () => {},
-        getSession: async () => ({ data: { session: null }, error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-        signInWithOAuth: async () => ({ error: new Error('Auth not configured') })
-      }
-    };
+try {
+  new URL(supabaseUrl);
+} catch (error) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('Invalid Supabase URL format');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
   }
-};
-
-export const supabase = getSupabaseClient();
+});
 
 // Test the connection
 supabase.auth.getSession()

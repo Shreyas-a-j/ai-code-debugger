@@ -1,196 +1,216 @@
 import React, { useState } from 'react';
 import styled from '@emotion/styled';
-import { motion } from 'framer-motion';
 import { supabase } from '../../config/supabaseClient';
 
-const AuthContainer = styled(motion.div)`
+const AuthContainer = styled.div`
   max-width: 400px;
-  margin: 4rem auto;
+  margin: 2rem auto;
   padding: 2rem;
   background: ${props => props.theme.surface};
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
-const Title = styled.h2`
-  text-align: center;
-  margin-bottom: 2rem;
-  color: ${props => props.theme.text.primary};
-`;
-
-const EmailForm = styled.form`
+const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 1rem;
 `;
 
 const Input = styled.input`
-  padding: 12px;
+  padding: 0.75rem;
   border: 1px solid ${props => props.theme.border};
-  border-radius: 8px;
+  border-radius: 4px;
   background: ${props => props.theme.background};
   color: ${props => props.theme.text.primary};
-  font-size: 16px;
+  font-size: 1rem;
 
   &:focus {
     outline: none;
-    border-color: ${props => props.theme.accent};
+    border-color: #7C3AED;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
   }
 `;
 
-const SubmitButton = styled(motion.button)`
-  padding: 12px;
-  background: ${props => props.theme.accent};
+const Button = styled.button`
+  padding: 0.75rem;
+  background: #7C3AED;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s;
 
   &:hover {
-    opacity: 0.9;
+    background: #6D28D9;
+  }
+
+  &:disabled {
+    background: #9F7AEA;
+    cursor: not-allowed;
   }
 `;
 
 const ErrorMessage = styled.div`
-  color: ${props => props.theme.error};
-  font-size: 14px;
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
   text-align: center;
-  margin-top: 1rem;
 `;
 
-const ToggleAuthButton = styled.button`
-  background: none;
-  border: none;
-  color: ${props => props.theme.accent};
-  cursor: pointer;
-  font-size: 14px;
-  margin-top: 1rem;
+const ToggleText = styled.p`
   text-align: center;
-  width: 100%;
+  margin-top: 1rem;
+  color: ${props => props.theme.text.secondary};
 
-  &:hover {
-    text-decoration: underline;
+  span {
+    color: #7C3AED;
+    cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 `;
 
-const PasswordRequirements = styled.div`
-  font-size: 12px;
-  color: ${props => props.theme.text.secondary};
-  margin-top: 0.5rem;
-`;
-
 const Auth = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
 
-  const handleEmailAuth = async (e) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setError('');
+  };
+
+  const validateForm = () => {
+    if (isSignUp && formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
     
     try {
-      setIsLoading(true);
-      setError(null);
-
       if (isSignUp) {
-        // Validate passwords match
-        if (password !== confirmPassword) {
-          throw new Error('Passwords do not match');
-        }
-
-        // Validate password requirements
-        if (password.length < 8) {
-          throw new Error('Password must be at least 8 characters long');
-        }
-
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
           options: {
-            emailRedirectTo: undefined,
+            emailRedirectTo: window.location.origin,
             data: {
-              email_confirmed: true
+              email_confirmed: true // This helps bypass email confirmation
             }
           }
         });
+
         if (error) throw error;
         
-        // Automatically sign in after successful registration
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (signInError) throw signInError;
+        // If signup is successful, sign in immediately
+        if (data?.user) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password,
+          });
+
+          if (signInError) throw signInError;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
+          email: formData.email,
+          password: formData.password,
         });
+
         if (error) throw error;
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      setError(error.message);
+      console.error('Error:', error.message);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <AuthContainer
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <Title>Welcome to AI Code Debugger</Title>
-      
-      <EmailForm onSubmit={handleEmailAuth}>
+    <AuthContainer>
+      <Form onSubmit={handleSubmit}>
+        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          {isSignUp ? 'Create Account' : 'Sign In'}
+        </h2>
+        
         <Input
           type="email"
+          name="email"
           placeholder="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={formData.email}
+          onChange={handleInputChange}
           required
         />
+        
         <Input
           type="password"
+          name="password"
           placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={formData.password}
+          onChange={handleInputChange}
           required
         />
+
         {isSignUp && (
-          <>
-            <Input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-            <PasswordRequirements>
-              Password must be at least 8 characters long
-            </PasswordRequirements>
-          </>
+          <Input
+            type="password"
+            name="confirmPassword"
+            placeholder="Confirm Password"
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
+            required
+          />
         )}
-        <SubmitButton
-          type="submit"
-          disabled={isLoading}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {isLoading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
-        </SubmitButton>
-      </EmailForm>
+        
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+        </Button>
 
-      <ToggleAuthButton onClick={() => setIsSignUp(!isSignUp)}>
-        {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-      </ToggleAuthButton>
-
-      {error && <ErrorMessage>{error}</ErrorMessage>}
+        <ToggleText>
+          {isSignUp ? (
+            <>
+              Already have an account?{' '}
+              <span onClick={() => setIsSignUp(false)}>Sign In</span>
+            </>
+          ) : (
+            <>
+              Don't have an account?{' '}
+              <span onClick={() => setIsSignUp(true)}>Sign Up</span>
+            </>
+          )}
+        </ToggleText>
+      </Form>
     </AuthContainer>
   );
 };
